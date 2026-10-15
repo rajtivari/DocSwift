@@ -1,5 +1,8 @@
 import {useMemo,useRef,useState} from 'react';
 import {PDFDocument,degrees} from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorkerUrl;
 import {FileText,Files,Scissors,RotateCw,ArrowDownUp,Image as ImageIcon,Info,Minimize2,ArrowRight,ShieldCheck,LockKeyhole,Zap,Upload,CheckCircle2,Menu,X,ChevronDown,ExternalLink} from 'lucide-react';
 const tools=[
 {id:'merge',name:'Merge PDF',desc:'Combine PDFs in the order you choose.',icon:Files,group:'Organize',multi:true},
@@ -8,7 +11,7 @@ const tools=[
 {id:'reorder',name:'Reorder pages',desc:'Arrange pages in a custom order.',icon:ArrowDownUp,group:'Organize'},
 {id:'images-to-pdf',name:'Images to PDF',desc:'Turn JPG or PNG images into a PDF.',icon:ImageIcon,group:'Convert',multi:true,images:true},
 {id:'info',name:'PDF details',desc:'Inspect page count and document metadata.',icon:Info,group:'Utilities'},
-{id:'compress',name:'Optimize PDF',desc:'Rewrite PDF structure and compare size.',icon:Minimize2,group:'Optimize'}
+{id:'compress',name:'Compress PDF',desc:'Reduce PDF size with adjustable image quality.',icon:Minimize2,group:'Optimize'}
 ];
 const pretty=n=>n<1048576?Math.max(1,Math.round(n/1024))+' KB':(n/1048576).toFixed(2)+' MB';
 function Brand(){return <a className="brand" href="./" aria-label="DocSwift home"><span className="brand-icon"><FileText size={23}/></span><span>doc<span>swift</span></span></a>}
@@ -16,7 +19,7 @@ function App(){
 const [category,setCategory]=useState('All tools'),[tool,setTool]=useState(null),[files,setFiles]=useState([]),[pages,setPages]=useState('1,3'),[order,setOrder]=useState('3,1,2'),[angle,setAngle]=useState('90'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[details,setDetails]=useState(null),[mobile,setMobile]=useState(false),[faq,setFaq]=useState(-1),[drag,setDrag]=useState(false);
 const picker=useRef(null);
 const shown=useMemo(()=>category==='All tools'?tools:tools.filter(t=>t.group===category),[category]);
-function open(t){setTool(t);setFiles([]);setError('');setSuccess('');setDetails(null);setPages('1,3');setOrder('3,1,2');setAngle('90');}
+function open(t){setTool(t);setFiles([]);setError('');setSuccess('');setDetails(null);setPages('1,3');setOrder('3,1,2');setAngle('90');setCompression('balanced');}
 function add(incoming){let list=Array.from(incoming||[]);if(!list.length)return;setFiles(old=>tool?.multi?[...old,...list].slice(0,15):[list[0]]);setError('');setSuccess('');}
 async function run(){if(!files.length){setError('Choose a file first.');return}if(tool.id==='merge'&&files.length<2){setError('Choose at least two PDFs to merge.');return}setBusy(true);setError('');setSuccess('');setDetails(null);
 try{
@@ -32,11 +35,38 @@ if(tool.id==='images-to-pdf'){
  else if(tool.id==='split'){const ids=String(pages).split(',').map(x=>Number(x.trim()));if(!ids.length||ids.some(n=>!Number.isInteger(n)||n<1||n>doc.getPageCount())||new Set(ids).size!==ids.length)throw Error('Enter unique page numbers between 1 and '+doc.getPageCount()+'.');const out=await PDFDocument.create();(await out.copyPages(doc,ids.map(n=>n-1))).forEach(p=>out.addPage(p));blob=new Blob([await out.save()],{type:'application/pdf'});}
  else if(tool.id==='rotate'){const deg=Number(angle);if(![90,180,270].includes(deg))throw Error('Choose 90, 180 or 270 degrees.');doc.getPages().forEach(p=>p.setRotation(degrees((p.getRotation().angle+deg)%360)));blob=new Blob([await doc.save()],{type:'application/pdf'});}
  else if(tool.id==='reorder'){const ids=String(order).split(',').map(x=>Number(x.trim()));if(ids.length!==doc.getPageCount()||ids.some(n=>!Number.isInteger(n)||n<1||n>doc.getPageCount())||new Set(ids).size!==ids.length)throw Error('Enter every page number exactly once, from 1 to '+doc.getPageCount()+'.');const out=await PDFDocument.create();(await out.copyPages(doc,ids.map(n=>n-1))).forEach(p=>out.addPage(p));blob=new Blob([await out.save()],{type:'application/pdf'});}
- else if(tool.id==='compress'){blob=new Blob([await doc.save({useObjectStreams:true})],{type:'application/pdf'});}
+ else if(tool.id==='compress'){
+  if(compression==='lossless'){
+    blob=new Blob([await doc.save({useObjectStreams:true,addDefaultPage:false})],{type:'application/pdf'});
+  }else{
+    const profiles={light:{scale:1.55,quality:0.78},balanced:{scale:1.18,quality:0.62},strong:{scale:0.88,quality:0.46}};
+    const profile=profiles[compression]||profiles.balanced;
+    const loading=pdfjsLib.getDocument({data:new Uint8Array(bytes)});
+    const source=await loading.promise;
+    const out=await PDFDocument.create();
+    for(let i=1;i<=source.numPages;i++){
+      const page=await source.getPage(i);
+      const viewport=page.getViewport({scale:profile.scale});
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.floor(viewport.width));canvas.height=Math.max(1,Math.floor(viewport.height));
+      const ctx=canvas.getContext('2d',{alpha:false});
+      if(!ctx)throw Error('Your browser could not create a canvas for compression.');
+      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);
+      await page.render({canvasContext:ctx,viewport}).promise;
+      const jpg=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Could not compress page '+i+'.')),'image/jpeg',profile.quality));
+      const image=await out.embedJpg(await jpg.arrayBuffer());
+      const outPage=out.addPage([image.width/profile.scale,image.height/profile.scale]);
+      outPage.drawImage(image,{x:0,y:0,width:image.width/profile.scale,height:image.height/profile.scale});
+      canvas.width=1;canvas.height=1;page.cleanup();
+    }
+    await source.destroy();
+    blob=new Blob([await out.save({useObjectStreams:true})],{type:'application/pdf'});
+  }
+}
 }
 if(!blob)throw Error('Could not process this file.');
 const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=({merge:'docswift-merged.pdf',split:'docswift-split.pdf',rotate:'docswift-rotated.pdf',reorder:'docswift-reordered.pdf',compress:'docswift-optimized.pdf','images-to-pdf':'docswift-images.pdf'})[tool.id];document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-if(tool.id==='compress')setSuccess('Done. Original '+pretty(files[0].size)+' · output '+pretty(blob.size)+'. This rewrites PDF structure and may not reduce file size.');else setSuccess('Done — your file was processed locally and the download has started.');
+if(tool.id==='compress')setSuccess('Original '+pretty(files[0].size)+' · output '+pretty(blob.size)+' · '+(blob.size<files[0].size?Math.round((1-blob.size/files[0].size)*100)+'% smaller.':'the output is not smaller for this document.')+(compression==='lossless'?' Lossless rewrite preserves page content.':' Pages were converted to images; selectable text, links, forms and accessibility may be lost.'));else setSuccess('Done — your file was processed locally and the download has started.');
 }catch(e){setError(e.message||'Something went wrong.')}finally{setBusy(false)}}
 const close=()=>{if(!busy){setTool(null);setFiles([])}};
 return <div className="app"><header className="header"><div className="nav wrap"><Brand/><nav className={mobile?'navlinks show':'navlinks'}><a href="#tools" onClick={()=>setMobile(false)}>Tools</a><a href="#how" onClick={()=>setMobile(false)}>How it works</a><a href="#faq" onClick={()=>setMobile(false)}>FAQ</a><a href="#privacy" onClick={()=>setMobile(false)}>Privacy</a></nav><div className="nav-right"><span className="free"><Zap size={14}/> Free tools</span><button className="menu-btn" onClick={()=>setMobile(!mobile)} aria-label="Toggle menu">{mobile?<X/>:<Menu/>}</button></div></div></header>
@@ -53,6 +83,6 @@ return <div className="app"><header className="header"><div className="nav wrap"
 ].map(([q,a],i)=><div className="faq-item" key={q}><button onClick={()=>setFaq(faq===i?-1:i)} aria-expanded={faq===i}>{q}<ChevronDown className={faq===i?'rotated':''}/></button>{faq===i&&<p>{a}</p>}</div>)}</div></section>
 <section className="privacy-band" id="privacy"><div className="wrap privacy-inner"><ShieldCheck size={30}/><div><h2>Documents deserve care.</h2><p>DocSwift does not require an account. Files are processed locally in your browser and are not sent to a DocSwift processing server.</p><a href="./privacy.html">Read the privacy notice <ExternalLink size={14}/></a></div></div></section></main>
 <footer className="footer"><div className="wrap footer-inner"><Brand/><span>Useful PDF tools. Open source by design.</span><div><a href="./privacy.html">Privacy</a><a href="./sitemap.xml">Sitemap</a><a href="https://github.com/rajtivari/DocSwift" target="_blank" rel="noreferrer">GitHub</a></div><small>© {new Date().getFullYear()} DocSwift. Open source under MIT.</small></div></footer>
-{tool&&<div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-head"><div><div className="eyebrow dark">DOCSWIFT TOOL</div><h2 id="modal-title">{tool.name}</h2><p>{tool.desc}</p></div><button className="close" onClick={close} aria-label="Close dialog"><X/></button></div><div className={'dropzone '+(drag?'drag':'')} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);add(e.dataTransfer.files)}} onClick={()=>picker.current?.click()}><Upload size={28}/><b>Drop files here or browse</b><small>{tool.images?'JPG or PNG images':'PDF files'} · 30 MB per file · up to 15 files</small><input ref={picker} type="file" accept={tool.images?'image/jpeg,image/png':'.pdf,application/pdf'} multiple={!!tool.multi} onChange={e=>add(e.target.files)} hidden/></div>{files.length>0&&<div className="selected-files">{files.map((f,i)=><div key={i}><FileText size={17}/><span>{f.name}<small>{pretty(f.size)}</small></span><button onClick={()=>setFiles(old=>old.filter((_,j)=>j!==i))} aria-label={'Remove '+f.name}><X size={16}/></button></div>)}</div>}{tool.id==='split'&&<label className="field">Pages to extract<input value={pages} onChange={e=>setPages(e.target.value)} placeholder="e.g. 1,3,5"/></label>}{tool.id==='reorder'&&<label className="field">New page order<input value={order} onChange={e=>setOrder(e.target.value)} placeholder="e.g. 3,1,2,4"/><small>Enter every page number once, separated by commas.</small></label>}{tool.id==='rotate'&&<label className="field">Rotation angle<select value={angle} onChange={e=>setAngle(e.target.value)}><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">270° clockwise</option></select></label>}{error&&<p className="notice error">{error}</p>}{success&&<p className="notice success"><CheckCircle2 size={17}/>{success}</p>}{details&&<div className="details"><b>Document details</b><span>File: {details.name}</span><span>Pages: {details.pages}</span><span>Size: {pretty(details.bytes)}</span><span>Title: {details.title||'Not set'}</span><span>Author: {details.author||'Not set'}</span></div>}<button className="btn primary process" disabled={busy} onClick={run}>{busy?'Processing…':tool.id==='info'?'Inspect PDF':'Process '+tool.name}<ArrowRight size={17}/></button><p className="modal-foot"><LockKeyhole size={13}/> Files stay on your device while processing.</p></section></div>}
+{tool&&<div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-head"><div><div className="eyebrow dark">DOCSWIFT TOOL</div><h2 id="modal-title">{tool.name}</h2><p>{tool.desc}</p></div><button className="close" onClick={close} aria-label="Close dialog"><X/></button></div><div className={'dropzone '+(drag?'drag':'')} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);add(e.dataTransfer.files)}} onClick={()=>picker.current?.click()}><Upload size={28}/><b>Drop files here or browse</b><small>{tool.images?'JPG or PNG images':'PDF files'} · 30 MB per file · up to 15 files</small><input ref={picker} type="file" accept={tool.images?'image/jpeg,image/png':'.pdf,application/pdf'} multiple={!!tool.multi} onChange={e=>add(e.target.files)} hidden/></div>{files.length>0&&<div className="selected-files">{files.map((f,i)=><div key={i}><FileText size={17}/><span>{f.name}<small>{pretty(f.size)}</small></span><button onClick={()=>setFiles(old=>old.filter((_,j)=>j!==i))} aria-label={'Remove '+f.name}><X size={16}/></button></div>)}</div>}{tool.id==='split'&&<label className="field">Pages to extract<input value={pages} onChange={e=>setPages(e.target.value)} placeholder="e.g. 1,3,5"/></label>}{tool.id==='reorder'&&<label className="field">New page order<input value={order} onChange={e=>setOrder(e.target.value)} placeholder="e.g. 3,1,2,4"/><small>Enter every page number once, separated by commas.</small></label>}{tool.id==='compress'&&<label className="field">Compression level<select value={compression} onChange={e=>setCompression(e.target.value)}><option value="light">Light — better quality, larger file</option><option value="balanced">Balanced — recommended</option><option value="strong">Strong — smallest output, lower quality</option><option value="lossless">Lossless rewrite — may not shrink much</option></select><small>Image-based compression can reduce quality and removes searchable/selectable text and interactive PDF elements. Choose lossless to keep page content.</small></label>}{tool.id==='rotate'&&<label className="field">Rotation angle<select value={angle} onChange={e=>setAngle(e.target.value)}><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">270° clockwise</option></select></label>}{error&&<p className="notice error">{error}</p>}{success&&<p className="notice success"><CheckCircle2 size={17}/>{success}</p>}{details&&<div className="details"><b>Document details</b><span>File: {details.name}</span><span>Pages: {details.pages}</span><span>Size: {pretty(details.bytes)}</span><span>Title: {details.title||'Not set'}</span><span>Author: {details.author||'Not set'}</span></div>}<button className="btn primary process" disabled={busy} onClick={run}>{busy?'Processing…':tool.id==='info'?'Inspect PDF':'Process '+tool.name}<ArrowRight size={17}/></button><p className="modal-foot"><LockKeyhole size={13}/> Files stay on your device while processing.</p></section></div>}
 </div>}
 export default App;
