@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /api/
-Sitemap: https://rajtivari.github.io/DocSwift/sitemap.xml
+Sitemap: https://rajtivari.qd.je/sitemap.xml
