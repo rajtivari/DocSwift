@@ -63,4 +63,4 @@ Before public launch, add rate limiting and request timeouts, consider content v
 PDF-to-Word, Word-to-PDF, OCR, signatures, visual PDF editing and true image recompression are not implemented. Some encrypted, malformed, or advanced PDFs may fail.
 
 ## License
-MIT license intended. Add the `LICENSE` file before publishing a release. See `CONTRIBUTING.md` for contribution guidance.
+MIT. See [LICENSE](LICENSE). Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
