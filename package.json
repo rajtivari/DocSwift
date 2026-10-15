@@ -1,0 +1,10 @@
+{
+  "name": "docswift",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "scripts": {"dev":"concurrently -k \"npm:server:dev\" \"npm:client:dev\"","server:dev":"node --watch server/index.js","client:dev":"vite --host 0.0.0.0","build":"vite build","start":"NODE_ENV=production node server/index.js"},
+  "dependencies": {"@vitejs/plugin-react":"latest","concurrently":"^9.1.2","express":"^4.21.2","lucide-react":"^0.468.0","multer":"^1.4.5-lts.1","pdf-lib":"^1.17.1","react":"^18.3.1","react-dom":"^18.3.1","vite":"^6.0.7"},
+  "devDependencies": {},
+  "engines":{"node":">=20"}
+}
