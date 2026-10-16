@@ -7,6 +7,7 @@ import {PDFDocument,degrees} from 'pdf-lib';
 
 import Razorpay from 'razorpay';
 import crypto from 'node:crypto';
+import {createClient} from '@supabase/supabase-js';
 const app=express(),PORT=process.env.PORT||4000,MAX=30*1024*1024,MAX_FILES=15;
 app.disable('x-powered-by');
 app.use((req,res,next)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');next()});
@@ -37,9 +38,61 @@ app.use('/api',(req,res,next)=>{
   if(req.method==='OPTIONS')return origin&&allowedOrigins.has(origin)?res.sendStatus(204):res.sendStatus(403);
   next();
 });
+function supabaseAdmin(){
+  const url=process.env.SUPABASE_URL;
+  const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!url||!key)throw Object.assign(new Error('Premium account billing is not configured yet. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Render server environment.'),{status:503});
+  return createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+}
+async function requireUser(req){
+  const header=req.headers.authorization||'';
+  const token=header.startsWith('Bearer ')?header.slice(7):'';
+  if(!token)throw Object.assign(new Error('Please sign in to your DocSwift account before purchasing or checking Premium.'),{status:401});
+  const admin=supabaseAdmin();
+  const {data,error}=await admin.auth.getUser(token);
+  if(error||!data?.user)throw Object.assign(new Error('Your session is invalid or expired. Sign in again and retry.'),{status:401});
+  return {admin,user:data.user};
+}
 app.get('/api/billing/config',(_req,res)=>res.json({enabled:Boolean(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET),mode:(process.env.RAZORPAY_KEY_ID||'').startsWith('rzp_test_')?'test':'live'}));
-app.post(['/api/billing/order','/api/create-order'],wrap(async(req,res)=>{const plan=billingPlans[req.body?.plan];if(!plan)throw Object.assign(new Error('Choose a valid plan.'),{status:400});const {client,key_id}=razorpayClient();if(!key_id.startsWith('rzp_test_')&&process.env.ALLOW_LIVE_PAYMENTS!=='true')throw Object.assign(new Error('Live payments are disabled. Configure Razorpay test keys first.'),{status:403});if(!Number.isInteger(plan.amount)||plan.amount<100)throw Object.assign(new Error('Payment amount must be at least 100 paise.'),{status:400});let order;try{order=await client.orders.create({amount:plan.amount,currency:plan.currency,receipt:'ds_'+crypto.randomBytes(8).toString('hex'),notes:{product:'DocSwift',plan:'premium',mode:key_id.startsWith('rzp_test_')?'test':'live'}})}catch(err){throw razorpayError(err)}res.json({order_id:order.id,orderId:order.id,amount:order.amount,currency:order.currency,keyId:key_id,demo:key_id.startsWith('rzp_test_')});}));
-app.post(['/api/billing/verify','/api/verify-payment'],wrap(async(req,res)=>{const {razorpay_order_id,razorpay_payment_id,razorpay_signature,plan='premium'}=req.body||{};if(!razorpay_order_id||!razorpay_payment_id||!razorpay_signature||!billingPlans[plan])throw Object.assign(new Error('Missing payment verification details.'),{status:400});const {client}=razorpayClient();const expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(razorpay_order_id+'|'+razorpay_payment_id).digest('hex'),a=Buffer.from(expected),b=Buffer.from(String(razorpay_signature));if(a.length!==b.length||!crypto.timingSafeEqual(a,b))throw Object.assign(new Error('Payment signature could not be verified. Access was not granted.'),{status:400});let payment;try{payment=await client.payments.fetch(razorpay_payment_id)}catch(err){throw razorpayError(err)}if(payment.order_id!==razorpay_order_id||!['captured','authorized'].includes(payment.status))throw Object.assign(new Error('Payment is not authorized or captured. Access was not granted.'),{status:402});res.json({verified:true,plan:'premium',paymentId:razorpay_payment_id,mode:(process.env.RAZORPAY_KEY_ID||'').startsWith('rzp_test_')?'test':'live',accessUntil:new Date(Date.now()+billingPlans[plan].days*86400000).toISOString(),message:'Payment signature verified. Premium access active.'});}));
+app.get('/api/billing/status',wrap(async(req,res)=>{
+  const {admin,user}=await requireUser(req);
+  const {data,error}=await admin.from('subscriptions').select('plan,status,current_period_end').eq('user_id',user.id).eq('plan','premium').eq('status','active').gt('current_period_end',new Date().toISOString()).order('current_period_end',{ascending:false}).limit(1).maybeSingle();
+  if(error)throw Object.assign(new Error('Could not check Premium status in the database. Check the Supabase server configuration.'),{status:503});
+  res.json({premium:Boolean(data),accessUntil:data?.current_period_end||null,plan:data?.plan||'free'});
+}));
+app.post(['/api/billing/order','/api/create-order'],wrap(async(req,res)=>{
+  const {admin,user}=await requireUser(req);
+  const plan=billingPlans[req.body?.plan];
+  if(!plan)throw Object.assign(new Error('Choose a valid plan.'),{status:400});
+  const {client,key_id}=razorpayClient();
+  if(!key_id.startsWith('rzp_test_')&&process.env.ALLOW_LIVE_PAYMENTS!=='true')throw Object.assign(new Error('Live payments are disabled. Configure Razorpay test keys first.'),{status:403});
+  if(!Number.isInteger(plan.amount)||plan.amount<100)throw Object.assign(new Error('Payment amount must be at least 100 paise.'),{status:400});
+  let order;
+  try{order=await client.orders.create({amount:plan.amount,currency:plan.currency,receipt:'ds_'+crypto.randomBytes(8).toString('hex'),notes:{product:'DocSwift',plan:'premium',user_id:user.id,mode:key_id.startsWith('rzp_test_')?'test':'live'}})}catch(err){throw razorpayError(err)}
+  const {error}=await admin.from('payments').insert({user_id:user.id,provider:'razorpay',provider_order_id:order.id,amount_paise:order.amount,currency:order.currency,status:'created'});
+  if(error)throw Object.assign(new Error('Payment order was created, but billing could not save it. Please retry or contact support.'),{status:503});
+  res.json({order_id:order.id,orderId:order.id,amount:order.amount,currency:order.currency,keyId:key_id,demo:key_id.startsWith('rzp_test_')});
+}));
+app.post(['/api/billing/verify','/api/verify-payment'],wrap(async(req,res)=>{
+  const {admin,user}=await requireUser(req);
+  const {razorpay_order_id,razorpay_payment_id,razorpay_signature,plan='premium'}=req.body||{};
+  if(!razorpay_order_id||!razorpay_payment_id||!razorpay_signature||!billingPlans[plan])throw Object.assign(new Error('Missing payment verification details.'),{status:400});
+  const {client}=razorpayClient();
+  const expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(razorpay_order_id+'|'+razorpay_payment_id).digest('hex');
+  const a=Buffer.from(expected),b=Buffer.from(String(razorpay_signature));
+  if(a.length!==b.length||!crypto.timingSafeEqual(a,b))throw Object.assign(new Error('Payment signature could not be verified. Access was not granted.'),{status:400});
+  let order,payment;
+  try{[order,payment]=await Promise.all([client.orders.fetch(razorpay_order_id),client.payments.fetch(razorpay_payment_id)])}catch(err){throw razorpayError(err)}
+  if(order.notes?.user_id!==user.id||order.notes?.plan!=='premium')throw Object.assign(new Error('This payment order does not belong to your signed-in account.'),{status:403});
+  if(order.amount!==billingPlans[plan].amount||order.currency!==billingPlans[plan].currency)throw Object.assign(new Error('Payment amount does not match the Premium plan.'),{status:400});
+  if(payment.order_id!==razorpay_order_id||payment.amount!==order.amount||payment.currency!==order.currency||payment.status!=='captured')throw Object.assign(new Error('Payment is not captured and verified yet. No Premium access was granted.'),{status:402});
+  const now=new Date(),accessUntil=new Date(now.getTime()+billingPlans[plan].days*86400000);
+  const {error:paymentError}=await admin.from('payments').update({provider_payment_id:razorpay_payment_id,status:'captured',updated_at:now.toISOString()}).eq('provider_order_id',razorpay_order_id).eq('user_id',user.id);
+  if(paymentError)throw Object.assign(new Error('Payment was verified, but the database could not save it. Please contact support before retrying.'),{status:503});
+  const {error:subError}=await admin.from('subscriptions').insert({user_id:user.id,plan:'premium',status:'active',provider:'razorpay',provider_subscription_id:razorpay_payment_id,current_period_start:now.toISOString(),current_period_end:accessUntil.toISOString()});
+  if(subError)throw Object.assign(new Error('Payment was verified, but Premium status could not be saved. Please contact support.'),{status:503});
+  res.json({verified:true,plan:'premium',mode:(process.env.RAZORPAY_KEY_ID||'').startsWith('rzp_test_')?'test':'live',accessUntil:accessUntil.toISOString(),message:'Payment verified and Premium access saved to your account.'});
+}));
 
 app.post('/api/merge',upload.array('files',MAX_FILES),wrap(async(req,res)=>{requirePdfs(req.files,2);const out=await PDFDocument.create();for(const f of req.files){const doc=await PDFDocument.load(f.buffer);(await out.copyPages(doc,doc.getPageIndices())).forEach(p=>out.addPage(p))}sendPdf(res,await out.save(),'docswift-merged.pdf')}));
 app.post('/api/split',upload.single('file'),wrap(async(req,res)=>{requirePdfs(req.file?[req.file]:[]);const doc=await PDFDocument.load(req.file.buffer),ids=parsePages(req.body.pages,doc.getPageCount()),out=await PDFDocument.create();(await out.copyPages(doc,ids)).forEach(p=>out.addPage(p));sendPdf(res,await out.save(),'docswift-split.pdf')}));
