@@ -41,7 +41,6 @@ if(tool.id==='pdf-to-jpg'||tool.id==='extract-text'){
  if(tool.id==='extract-text'){let all='';for(let n=1;n<=pdf.numPages;n++){const p=await pdf.getPage(n),tc=await p.getTextContent();all+='\\n\\n--- Page '+n+' ---\\n'+tc.items.map(x=>x.str).join(' ');}await pdf.destroy();blob=new Blob([all.trim()+'\\n'],{type:'text/plain;charset=utf-8'});}
  else {const n=Number(exportPage);if(!Number.isInteger(n)||n<1||n>pdf.numPages)throw Error('Enter a page number from 1 to '+pdf.numPages+'.');const p=await pdf.getPage(n),viewport=p.getViewport({scale:1.8}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw Error('Canvas unavailable.');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);await p.render({canvasContext:ctx,viewport}).promise;blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('JPG export failed.')),'image/jpeg',0.9));canvas.width=1;canvas.height=1;await pdf.destroy();}
 }else if(tool.id==='image-compress'){
-if(tool.id==='image-compress'){
  const file=files[0],image=await createImageBitmap(file),canvas=document.createElement('canvas');
  const scale=Math.min(1,2400/Math.max(image.width,image.height));canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
  const ctx=canvas.getContext('2d');if(!ctx)throw Error('Image processing is unavailable in this browser.');
