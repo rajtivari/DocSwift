@@ -64,3 +64,10 @@ PDF-to-Word, Word-to-PDF, OCR, signatures, visual PDF editing and true image rec
 
 ## License
 MIT. See [LICENSE](LICENSE). Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Razorpay payment demo (test mode)
+1. Deploy the Express server as a Render Web Service; GitHub Pages cannot run the billing API.
+2. In Razorpay, select **Test Mode** and create test API keys. Never commit keys to Git.
+3. Set server environment variables `RAZORPAY_KEY_ID=rzp_test_...` and `RAZORPAY_KEY_SECRET=...`. Keep live payments disabled.
+4. The Premium demo checkout creates a ₹99 INR order for 30-day demo access and verifies the signature on the server.
+5. This demo stores entitlement in browser localStorage and is not secure production authorization. Before selling access, add accounts, database-backed entitlements, idempotent webhooks, refunds/chargeback handling and server-enforced plan permissions. Never use localStorage alone as proof of payment.
