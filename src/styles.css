@@ -12,3 +12,6 @@
 /* Usage and plan status */
 .usage-panel{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:22px 0 4px;padding:15px 18px;border:1px solid #e3e9db;border-radius:14px;background:#f8fbf4}.usage-panel>div{display:grid;gap:5px}.usage-panel b{font-size:13px;color:#26313a}.usage-panel small{font-size:12px;color:#77816e;line-height:1.5}.usage-upgrade{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;background:#b9f66b;color:#243018;font-size:12px;font-weight:800;padding:10px 12px;border-radius:9px}.usage-upgrade:hover{filter:brightness(.96)}
 @media(max-width:620px){.usage-panel{align-items:flex-start;padding:13px;gap:10px}.usage-panel small{font-size:11px}.usage-upgrade{padding:9px 10px}}
+
+/* Clear, polished Premium membership state */
+.free:has(svg){transition:background .2s,color .2s}.premium-status{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #dceac9;background:#f2f9e8;border-radius:9px;color:#4d7226;font-size:11px;font-weight:800}.usage-panel:has(.usage-upgrade){background:linear-gradient(110deg,#f8fbf4,#fff)}.usage-panel:not(:has(.usage-upgrade)){border-color:#d6e8bd;background:linear-gradient(110deg,#f4fae9,#fff)}
