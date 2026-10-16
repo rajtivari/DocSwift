@@ -22,7 +22,9 @@
     "vite": "^6.0.7",
     "pdfjs-dist": "^4.10.38",
     "razorpay": "^2.9.6",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "tesseract.js": "^6.0.1",
+    "docx": "^9.5.1"
   },
   "devDependencies": {},
   "engines": {
