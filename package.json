@@ -24,7 +24,8 @@
     "razorpay": "^2.9.6",
     "dotenv": "^16.4.7",
     "tesseract.js": "^6.0.1",
-    "docx": "^9.5.1"
+    "docx": "^9.5.1",
+    "@supabase/supabase-js": "^2.57.0"
   },
   "devDependencies": {},
   "engines": {
