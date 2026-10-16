@@ -18,5 +18,40 @@
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <title>DocSwift — Free Online PDF Tools</title>
 </head>
-<body><div id="root"></div><script type="module" src="./src/main.jsx"></script></body>
+<body>
+  <div id="root"></div>
+  <script>
+    (() => {
+      let shown = false;
+      function report(title, detail) {
+        if (shown) return;
+        shown = true;
+        const panel = document.createElement('main');
+        panel.style.cssText = 'font:16px/1.5 system-ui,sans-serif;max-width:720px;margin:10vh auto;padding:24px;color:#202833';
+        const heading = document.createElement('h1');
+        heading.textContent = title;
+        heading.style.fontSize = '26px';
+        const explanation = document.createElement('p');
+        explanation.textContent = 'DocSwift loaded its webpage, but its app script failed. Share this message to identify the exact issue.';
+        const error = document.createElement('pre');
+        error.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:16px;border-radius:10px';
+        error.textContent = String(detail || 'No additional browser details were provided.');
+        panel.append(heading, explanation, error);
+        document.body.replaceChildren(panel);
+      }
+      window.addEventListener('error', event => {
+        if (event.target && event.target !== window && event.target.tagName === 'SCRIPT') {
+          report('DocSwift app script failed to load', event.target.src || event.message);
+        } else if (event.message) {
+          report('DocSwift JavaScript error', event.message + (event.filename ? '\\n' + event.filename + ':' + event.lineno : ''));
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', event => {
+        const reason = event.reason;
+        report('DocSwift startup error', reason && reason.message ? reason.message : reason);
+      });
+    })();
+  </script>
+  <script type="module" src="./src/main.jsx"></script>
+</body>
 </html>
