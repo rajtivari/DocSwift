@@ -15,3 +15,14 @@
 
 /* Clear, polished Premium membership state */
 .free:has(svg){transition:background .2s,color .2s}.premium-status{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #dceac9;background:#f2f9e8;border-radius:9px;color:#4d7226;font-size:11px;font-weight:800}.usage-panel:has(.usage-upgrade){background:linear-gradient(110deg,#f8fbf4,#fff)}.usage-panel:not(:has(.usage-upgrade)){border-color:#d6e8bd;background:linear-gradient(110deg,#f4fae9,#fff)}
+
+
+/* Premium membership experience */
+.premium-pill{background:#18211a!important;color:#d7ff9a!important;border:1px solid #4c6838;box-shadow:0 3px 12px #b9f66b20}
+.premium-workspace{border-color:#c9e5a8;background:linear-gradient(112deg,#f0f9e3 0%,#fbfff5 55%,#fff 100%);box-shadow:0 8px 24px #344a1c0b}
+.premium-workspace>div>b{display:flex;align-items:center;gap:8px;color:#36521e;font-size:14px}
+.premium-workspace>div>b svg{color:#719c37}
+.premium-perks{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px}
+.premium-perks span{display:inline-flex;align-items:center;gap:5px;color:#55753a;font-size:11px;font-weight:700}
+.premium-perks svg{color:#76a83c}
+@media(max-width:620px){.premium-perks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.premium-perks span{font-size:10px}.premium-workspace>div>b{font-size:13px}}
