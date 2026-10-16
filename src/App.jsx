@@ -26,7 +26,7 @@ function open(t){setTool(t);setFiles([]);setError('');setSuccess('');setDetails(
 function add(incoming){let list=Array.from(incoming||[]);if(!list.length)return;setFiles(old=>tool?.multi?[...old,...list].slice(0,15):[list[0]]);setError('');setSuccess('');}
 async function run(){if(!files.length){setError('Choose a file first.');return}if(tool.id==='merge'&&files.length<2){setError('Choose at least two PDFs to merge.');return}if(!tool.images){for(const f of files){if(f.size<8){setError(f.name+' is empty or too small to be a PDF. Choose a valid PDF file.');return}const head=new Uint8Array(await f.slice(0,1024).arrayBuffer());const sig=String.fromCharCode(...head);if(!sig.includes('%PDF-')){setError(f.name+' does not contain a valid PDF header. It may be renamed, corrupted, or not actually a PDF. Re-export it as PDF and try again.');return}}}setBusy(true);setError('');setSuccess('');setDetails(null);
 try{
-let blob;
+let blob,compressionKeptOriginal=false;
 if(tool.id==='images-to-pdf'){
  const out=await PDFDocument.create();
  for(const file of files){const bytes=await file.arrayBuffer();const img=file.type==='image/png'?await out.embedPng(bytes):await out.embedJpg(bytes);const page=out.addPage([img.width,img.height]);page.drawImage(img,{x:0,y:0,width:img.width,height:img.height});}
@@ -68,8 +68,9 @@ if(tool.id==='images-to-pdf'){
 }
 }
 if(!blob)throw Error('Could not process this file.');
+if(tool.id==='compress'&&blob.size>=files[0].size){blob=new Blob([bytes],{type:'application/pdf'});compressionKeptOriginal=true;}
 const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=({merge:'docswift-merged.pdf',split:'docswift-split.pdf',rotate:'docswift-rotated.pdf',reorder:'docswift-reordered.pdf',compress:'docswift-optimized.pdf','images-to-pdf':'docswift-images.pdf'})[tool.id];document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-if(tool.id==='compress')setSuccess('Original '+pretty(files[0].size)+' · output '+pretty(blob.size)+' · '+(blob.size<files[0].size?Math.round((1-blob.size/files[0].size)*100)+'% smaller.':'the output is not smaller for this document.')+(compression==='lossless'?' Lossless rewrite preserves page content.':' Pages were converted to images; selectable text, links, forms and accessibility may be lost.'));else setSuccess('Done — your file was processed locally and the download has started.');
+if(tool.id==='compress')setSuccess(compressionKeptOriginal?'This PDF could not be made smaller with the selected setting, so the original file was downloaded instead ('+pretty(files[0].size)+').': 'Original '+pretty(files[0].size)+' · output '+pretty(blob.size)+' · '+Math.round((1-blob.size/files[0].size)*100)+'% smaller.'+(compression==='lossless'?' The PDF was rewritten without rasterizing pages.':' Pages were converted to images; selectable text, links, forms and accessibility may be lost.'));else setSuccess('Done — your file was processed locally and the download has started.');
 }catch(e){setError(e.message||'Something went wrong.')}finally{setBusy(false)}}
 const close=()=>{if(!busy){setTool(null);setFiles([])}};
 return <div className="app"><header className="header"><div className="nav wrap"><Brand/><nav className={mobile?'navlinks show':'navlinks'}><a href="#tools" onClick={()=>setMobile(false)}>Tools</a><a href="#pricing" onClick={()=>setMobile(false)}>Plans</a><a href="#how" onClick={()=>setMobile(false)}>How it works</a><a href="#faq" onClick={()=>setMobile(false)}>FAQ</a><a href="#privacy" onClick={()=>setMobile(false)}>Privacy</a></nav><div className="nav-right"><span className="free"><Zap size={14}/> Free tools</span><button className="menu-btn" onClick={()=>setMobile(!mobile)} aria-label="Toggle menu">{mobile?<X/>:<Menu/>}</button></div></div></header>
