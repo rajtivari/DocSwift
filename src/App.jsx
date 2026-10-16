@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorkerUrl;
 import {FileText,Files,Scissors,RotateCw,ArrowDownUp,Image as ImageIcon,Info,Minimize2,ArrowRight,ShieldCheck,LockKeyhole,Zap,Upload,CheckCircle2,Menu,X,ChevronDown,ExternalLink} from 'lucide-react';
-const API_BASE=(import.meta.env.VITE_API_BASE_URL||'').replace(/\\/$/,'');
+const API_BASE=(import.meta.env.VITE_API_BASE_URL||'').replace(/\/$/,'');
 const tools=[
 {id:'merge',name:'Merge PDF',desc:'Combine PDFs in the order you choose.',icon:Files,group:'Organize',multi:true},
 {id:'split',name:'Split PDF',desc:'Extract the pages you need.',icon:Scissors,group:'Organize'},
