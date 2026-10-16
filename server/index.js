@@ -86,8 +86,12 @@ app.post(['/api/billing/verify','/api/verify-payment'],wrap(async(req,res)=>{
   if(order.notes?.user_id!==user.id||order.notes?.plan!=='premium')throw Object.assign(new Error('This payment order does not belong to your signed-in account.'),{status:403});
   if(order.amount!==billingPlans[plan].amount||order.currency!==billingPlans[plan].currency)throw Object.assign(new Error('Payment amount does not match the Premium plan.'),{status:400});
   if(payment.order_id!==razorpay_order_id||payment.amount!==order.amount||payment.currency!==order.currency||payment.status!=='captured')throw Object.assign(new Error('Payment is not captured and verified yet. No Premium access was granted.'),{status:402});
+  const {data:storedPayment,error:storedPaymentError}=await admin.from('payments').select('status,provider_payment_id').eq('provider_order_id',razorpay_order_id).eq('user_id',user.id).maybeSingle();
+  if(storedPaymentError)throw Object.assign(new Error('Could not check whether this payment was already processed.'),{status:503});
+  if(!storedPayment)throw Object.assign(new Error('This payment order was not found for your account.'),{status:403});
+  if(storedPayment.status==='captured'||storedPayment.provider_payment_id)throw Object.assign(new Error('This payment has already been processed. Premium status will be checked from your account.'),{status:409});
   const now=new Date(),accessUntil=new Date(now.getTime()+billingPlans[plan].days*86400000);
-  const {error:paymentError}=await admin.from('payments').update({provider_payment_id:razorpay_payment_id,status:'captured',updated_at:now.toISOString()}).eq('provider_order_id',razorpay_order_id).eq('user_id',user.id);
+  const {error:paymentError}=await admin.from('payments').update({provider_payment_id:razorpay_payment_id,status:'captured',updated_at:now.toISOString()}).eq('provider_order_id',razorpay_order_id).eq('user_id',user.id).eq('status','created').is('provider_payment_id',null);
   if(paymentError)throw Object.assign(new Error('Payment was verified, but the database could not save it. Please contact support before retrying.'),{status:503});
   const {error:subError}=await admin.from('subscriptions').insert({user_id:user.id,plan:'premium',status:'active',provider:'razorpay',provider_subscription_id:razorpay_payment_id,current_period_start:now.toISOString(),current_period_end:accessUntil.toISOString()});
   if(subError)throw Object.assign(new Error('Payment was verified, but Premium status could not be saved. Please contact support.'),{status:503});
