@@ -26,3 +26,35 @@
 .premium-perks span{display:inline-flex;align-items:center;gap:5px;color:#55753a;font-size:11px;font-weight:700}
 .premium-perks svg{color:#76a83c}
 @media(max-width:620px){.premium-perks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.premium-perks span{font-size:10px}.premium-workspace>div>b{font-size:13px}}
+
+
+/* Supabase account access */
+.account-trigger,.account-signout{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #e2e7df;background:#fff;color:#26313a;border-radius:10px;padding:9px 11px;font:700 12px Manrope,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.account-trigger:hover,.account-signout:hover{border-color:#b9f66b;background:#f8fced}
+.account-signout{padding:9px;color:#68727e}
+.account-feedback{position:absolute;top:70px;right:20px;display:flex;gap:6px;align-items:center;background:#f0f9e3;color:#42651f;border:1px solid #d8e9c2;border-radius:10px;padding:9px 12px;font-size:11px;z-index:20;max-width:min(420px,calc(100vw - 30px))}
+.account-feedback-error{background:#fff1ed;color:#a74b38;border-color:#f3d3ca}
+.account-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(11,16,21,.64);backdrop-filter:blur(8px)}
+.account-dialog{position:relative;width:min(100%,430px);padding:30px;border:1px solid #e6ebdf;border-radius:22px;background:#fff;box-shadow:0 30px 100px #0004;color:#202a33}
+.account-close{position:absolute;right:16px;top:16px;display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:10px;background:#f4f6f2;color:#68727e;cursor:pointer}
+.account-mark{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:#eff9e3;color:#527c28}
+.account-eyebrow{margin:18px 0 7px;color:#6a8c42;font-size:10px;font-weight:900;letter-spacing:.15em}
+.account-dialog h2{margin:0;font:800 25px Manrope,system-ui,sans-serif;letter-spacing:-.04em}
+.account-subtitle{margin:9px 0 23px;color:#707b86;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.account-form{display:grid;gap:14px}
+.account-form label{display:grid;gap:7px;color:#36414b;font-size:12px;font-weight:800}
+.account-input-wrap{display:flex;align-items:center;gap:9px;padding:0 12px;border:1px solid #dfe5dc;border-radius:11px;color:#849078;background:#fff}
+.account-input-wrap:focus-within{border-color:#91bf59;box-shadow:0 0 0 3px #b9f66b30}
+.account-input-wrap input{width:100%;min-width:0;height:44px;border:0;outline:0;background:transparent;color:#202a33;font:500 13px Manrope,system-ui,sans-serif}
+.account-submit{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:45px;border:0;border-radius:11px;background:#b9f66b;color:#243018;font:800 13px Manrope,system-ui,sans-serif;cursor:pointer}
+.account-submit:disabled{opacity:.7;cursor:wait}
+.account-switch{margin:0;text-align:center;color:#7a838c;font-size:12px}
+.account-switch button{border:0;background:none;color:#4d7625;font:800 12px Manrope,system-ui,sans-serif;cursor:pointer}
+.account-error,.account-message{margin:0;padding:10px 12px;border-radius:9px;font-size:12px;line-height:1.5}
+.account-error{background:#fff1ed;color:#a74b38}
+.account-message{background:#f0f9e3;color:#42651f}
+.account-privacy{margin:20px 0 0;padding-top:15px;border-top:1px solid #eef1eb;color:#87908a;font-size:10px;line-height:1.6}
+.account-signed-in{display:grid;gap:13px;color:#527c28;font-size:13px;line-height:1.5}
+.account-spinner{animation:account-spin 1s linear infinite}
+@keyframes account-spin{to{transform:rotate(360deg)}}
+@media(max-width:760px){.account-trigger{padding:8px 9px}.account-trigger span{display:none}.account-trigger{width:35px;height:35px;padding:0}.account-signout{width:35px;height:35px;padding:0}.account-feedback{top:65px;right:12px}.account-dialog{padding:25px 22px}}
