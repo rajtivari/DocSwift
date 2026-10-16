@@ -1,4 +1,5 @@
-import {useMemo,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {supabase} from './supabase.js';
 import AccountAccess from './AccountAccess.jsx';
 import {PDFDocument,degrees,StandardFonts,rgb} from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -34,10 +35,40 @@ const tools=[
 const pretty=n=>n<1048576?Math.max(1,Math.round(n/1024))+' KB':(n/1048576).toFixed(2)+' MB';
 function Brand(){return <a className="brand" href="./" aria-label="DocSwift home"><span className="brand-icon"><FileText size={23}/></span><span>doc<span>swift</span></span></a>}
 function App(){
-const [category,setCategory]=useState('All tools'),[tool,setTool]=useState(null),[files,setFiles]=useState([]),[pages,setPages]=useState(''),[order,setOrder]=useState(''),[metaTitle,setMetaTitle]=useState(''),[metaAuthor,setMetaAuthor]=useState(''),[metaSubject,setMetaSubject]=useState(''),[angle,setAngle]=useState('90'),[compression,setCompression]=useState('balanced'),[quality,setQuality]=useState('70'),[watermarkText,setWatermarkText]=useState('CONFIDENTIAL'),[pagePosition,setPagePosition]=useState('bottom-center'),[cropMargin,setCropMargin]=useState('5'),[exportPage,setExportPage]=useState('1'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[details,setDetails]=useState(null),[mobile,setMobile]=useState(false),[faq,setFaq]=useState(-1),[pricingNotice,setPricingNotice]=useState(''),[paying,setPaying]=useState(false),[premiumAccess,setPremiumAccess]=useState(()=>{try{const v=JSON.parse(localStorage.getItem('docswift-premium-access')||'null');return v&&Date.parse(v.accessUntil)>Date.now()?v:null}catch{return null}}),[drag,setDrag]=useState(false),[usage,setUsage]=useState(()=>{try{const v=JSON.parse(localStorage.getItem('docswift-usage')||'{}');return v.day===new Date().toISOString().slice(0,10)?Number(v.count)||0:0}catch{return 0}});
+const [category,setCategory]=useState('All tools'),[tool,setTool]=useState(null),[files,setFiles]=useState([]),[pages,setPages]=useState(''),[order,setOrder]=useState(''),[metaTitle,setMetaTitle]=useState(''),[metaAuthor,setMetaAuthor]=useState(''),[metaSubject,setMetaSubject]=useState(''),[angle,setAngle]=useState('90'),[compression,setCompression]=useState('balanced'),[quality,setQuality]=useState('70'),[watermarkText,setWatermarkText]=useState('CONFIDENTIAL'),[pagePosition,setPagePosition]=useState('bottom-center'),[cropMargin,setCropMargin]=useState('5'),[exportPage,setExportPage]=useState('1'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[details,setDetails]=useState(null),[mobile,setMobile]=useState(false),[faq,setFaq]=useState(-1),[pricingNotice,setPricingNotice]=useState(''),[paying,setPaying]=useState(false),[premiumAccess,setPremiumAccess]=useState(null),[drag,setDrag]=useState(false),[usage,setUsage]=useState(()=>{try{const v=JSON.parse(localStorage.getItem('docswift-usage')||'{}');return v.day===new Date().toISOString().slice(0,10)?Number(v.count)||0:0}catch{return 0}});
 const picker=useRef(null);
+useEffect(()=>{let active=true;const syncPremium=async()=>{try{const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token){if(active)setPremiumAccess(null);return}const response=await fetch(API_BASE+'/api/billing/status',{headers:{Authorization:'Bearer '+session.access_token}});if(!response.ok){if(active)setPremiumAccess(null);return}const status=await response.json();if(active)setPremiumAccess(status.premium?{accessUntil:status.accessUntil,plan:'premium'}:null)}catch{if(active)setPremiumAccess(null)}};syncPremium();const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>{syncPremium()});return()=>{active=false;subscription.unsubscribe()}},[]);
 const shown=useMemo(()=>category==='All tools'?tools:tools.filter(t=>t.group===category),[category]);
-async function buyPremium(){setPricingNotice('');setPaying(true);try{const cr=await fetch(API_BASE+'/api/billing/config');if(!cr.ok)throw Error('Billing API is not reachable. Deploy the DocSwift server and configure Razorpay test keys first.');const cfg=await cr.json();if(!cfg.enabled)throw Error('Razorpay test mode is not configured. Add RAZORPAY_KEY_ID (rzp_test_...) and RAZORPAY_KEY_SECRET to the server environment.');if(!window.Razorpay)await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://checkout.razorpay.com/v1/checkout.js';script.onload=resolve;script.onerror=()=>reject(Error('Could not load Razorpay Checkout.'));document.head.appendChild(script)});const or=await fetch(API_BASE+'/api/billing/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:'premium'})});const order=await or.json();if(!or.ok)throw Error(order.error||'Could not create payment order.');await new Promise((resolve,reject)=>{const checkout=new window.Razorpay({key:order.keyId,amount:order.amount,currency:order.currency,name:'DocSwift',description:'DocSwift Premium — 30 days',order_id:order.orderId,theme:{color:'#b9f66b'},handler:async response=>{try{const vr=await fetch(API_BASE+'/api/billing/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...response,plan:'premium'})});const result=await vr.json();if(!vr.ok||!result.verified)throw Error(result.error||'Payment verification failed.');localStorage.setItem('docswift-premium-access',JSON.stringify(result));setPremiumAccess(result);setPricingNotice('Payment verified. Premium access active until '+new Date(result.accessUntil).toLocaleDateString()+'. '+(result.mode==='test'?'Payment was processed in test mode; no real money was charged.':''));resolve()}catch(e){reject(e)}},modal:{ondismiss:()=>reject(Error('Checkout closed before payment verification. No access was granted.'))}});checkout.on('payment.failed',r=>reject(Error(r.error?.description||'Payment failed. No access was granted.')));checkout.open()})}catch(e){setPricingNotice(e.message||'Payment could not be started.')}finally{setPaying(false)}}
+async function buyPremium(){
+setPricingNotice('');setPaying(true);
+try{
+ const {data:{session}}=await supabase.auth.getSession();
+ if(!session?.access_token)throw Error('Please sign in to your DocSwift account before purchasing Premium.');
+ const authHeaders={'Content-Type':'application/json','Authorization':'Bearer '+session.access_token};
+ const cr=await fetch(API_BASE+'/api/billing/config');
+ if(!cr.ok)throw Error('Billing API is not reachable. Please try again later.');
+ const cfg=await cr.json();
+ if(!cfg.enabled)throw Error('Razorpay is not configured on the server yet.');
+ if(!window.Razorpay)await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://checkout.razorpay.com/v1/checkout.js';script.onload=resolve;script.onerror=()=>reject(Error('Could not load Razorpay Checkout.'));document.head.appendChild(script)});
+ const or=await fetch(API_BASE+'/api/billing/order',{method:'POST',headers:authHeaders,body:JSON.stringify({plan:'premium'})});
+ const order=await or.json();
+ if(!or.ok)throw Error(order.error||'Could not create payment order.');
+ await new Promise((resolve,reject)=>{
+  const checkout=new window.Razorpay({key:order.keyId,amount:order.amount,currency:order.currency,name:'DocSwift',description:'DocSwift Premium — 30 days',order_id:order.orderId,theme:{color:'#b9f66b'},handler:async response=>{
+   try{
+    const vr=await fetch(API_BASE+'/api/billing/verify',{method:'POST',headers:authHeaders,body:JSON.stringify({...response,plan:'premium'})});
+    const result=await vr.json();
+    if(!vr.ok||!result.verified)throw Error(result.error||'Payment verification failed.');
+    setPremiumAccess({accessUntil:result.accessUntil,plan:'premium'});
+    setPricingNotice('Payment verified. Premium access active until '+new Date(result.accessUntil).toLocaleDateString()+'. '+(result.mode==='test'?'Payment was processed in test mode; no real money was charged.':''));
+    resolve();
+   }catch(e){reject(e)}
+  },modal:{ondismiss:()=>reject(Error('Checkout closed before payment verification. No access was granted.'))}});
+  checkout.on('payment.failed',r=>reject(Error(r.error?.description||'Payment failed. No access was granted.')));
+  checkout.open();
+ });
+}catch(e){setPricingNotice(e.message||'Payment could not be started.')}finally{setPaying(false)}
+}
 
 const hasPremium=Boolean(premiumAccess&&Date.parse(premiumAccess.accessUntil)>Date.now());
 const FREE_DAILY_LIMIT=10,FREE_MULTI_FILE_LIMIT=3;
