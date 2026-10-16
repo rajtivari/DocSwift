@@ -1,20 +1,46 @@
 # DocSwift
 
-A premium, responsive, open-source PDF toolkit built with React, Vite, Express and pdf-lib. No login system is included.
+A polished, responsive PDF and image toolkit built with React, Vite, pdf-lib, PDF.js and Tesseract.js. The frontend processes documents in the browser; no account is required to use the free tools.
 
-## Current tools
-- **Merge PDF** — combine multiple PDFs in upload order.
-- **Split PDF** — extract selected pages.
+## Available tools
+
+### Organize PDFs
+- **Merge PDF** — combine PDFs in the order selected.
+- **Split PDF** — extract pages or page ranges.
+- **Reorder pages** — specify a complete page order.
 - **Rotate PDF** — rotate pages by 90°, 180° or 270°.
-- **Reorder pages** — specify the complete page order.
-- **JPG/PNG to PDF** — make one PDF page per image.
-- **PDF details** — inspect page count, size, title and author.
-- **Optimize PDF** — rewrite PDF structure. This does not guarantee a smaller file or recompress every embedded image.
+- **Delete PDF pages** — remove page numbers or ranges while keeping at least one page.
+- **Add blank page** — append a blank page matching the document's first page size.
+- **Crop PDF** — adjust the visible crop box by a percentage.
+- **Page numbers** — add page numbers to each page.
+- **Watermark PDF** — stamp custom text on every page.
+
+### Convert and extract
+- **Images to PDF** — combine JPG/PNG images into a PDF.
+- **PDF to JPG / PNG** — export one selected page as an image.
+- **Extract PDF text** — export selectable text to TXT.
+- **PDF to Word** — place selectable PDF text into an editable DOCX.
+- **PDF to Markdown / HTML** — export selectable text into those formats.
+- **OCR PDF** — recognize text from scanned pages and download it as TXT.
+
+### Optimize and inspect
+- **Compress PDF** — lossless rewrite or image-based compression at different quality levels.
+- **Image compressor** — compress a JPG, PNG or WebP image.
+- **PDF details** — inspect page count, file size, title and author.
+- **Edit PDF metadata** — set title, author and subject.
+
+## Important compression details
+
+Lossless PDF rewriting preserves page content but may not reduce the file size. Image-based compression renders pages as images and rebuilds the PDF; it may reduce size, but selectable text, links, forms, accessibility information and other interactive content can be lost. If the generated file is not smaller, DocSwift downloads the original instead. Keep an original copy of important documents.
+
+Image compression outputs a compressed image; PNG transparency is flattened to white when converting to JPEG.
 
 ## Stack
-React 18 · Vite · Express · pdf-lib · Multer · Lucide
+
+React 18 · Vite · PDF.js · pdf-lib · Tesseract.js · docx · Express · Multer · Lucide React
 
 ## Run locally
+
 Requires Node.js 20+ and npm.
 
 ```bash
@@ -22,7 +48,7 @@ npm install
 npm run dev
 ```
 
-Vite runs on `http://localhost:5173`; the API runs on port 4000. The Vite dev server proxies `/api` to Express.
+Vite runs on `http://localhost:5173`; the optional Express API runs on port 4000.
 
 Production:
 
@@ -31,43 +57,29 @@ npm run build
 npm start
 ```
 
-## Deploy to Render
+## Deploy the API to Render
+
 1. Create a Render **Web Service** from this repository.
 2. Build command: `npm install && npm run build`
 3. Start command: `npm start`
 4. Select Node 20+ and set `NODE_ENV=production`.
-5. Deploy, then verify `/api/health` and test each tool with non-sensitive sample PDFs.
-6. Update canonical, Open Graph, Twitter, sitemap and robots URLs from the placeholder `https://docswift.onrender.com` to the actual production domain.
+5. Verify `/api/health` and test each tool with non-sensitive sample PDFs.
 
-## Launch checklist
-- [x] Unique page title and meta description.
-- [x] Open Graph/Twitter metadata and share artwork.
-- [x] Favicon and accessible labels for interactive controls.
-- [x] Internal navigation, FAQ and privacy notice.
-- [x] Sitemap and robots.txt.
-- [x] Custom 404 page file.
-- [x] Contribution guide.
-- [ ] Deploy and verify HTTPS end-to-end.
-- [ ] Submit the final sitemap in Google Search Console after the domain is stable.
-- [ ] Configure production rate limits, upload/time limits, monitoring and abuse protection.
-- [ ] Replace draft privacy notice with accurate operator/provider details and retention practices.
-- [ ] Add analytics only if needed, with applicable privacy disclosures and consent.
-- [ ] Add a real contact/feedback workflow before forms. Do not invent testimonials.
+The current frontend tool flows run in the browser; the Express API also includes PDF endpoints and a Razorpay test-mode billing flow. Do not treat browser-local plan flags as secure production authorization.
 
 ## Privacy and security
-Uploads are held in memory during processing and are not intentionally written to disk by this code. This does not prove that all infrastructure, logs, or hosting providers retain no data. Files are uploaded to the server; avoid sensitive documents until deployment practices are reviewed. This starter does not include Google Analytics, tracking cookies, contact forms, or testimonials, so a cookie banner, form spam protection, and thank-you page are not currently needed.
 
-Before public launch, add rate limiting and request timeouts, consider content validation, monitor memory usage, test malformed/encrypted PDFs, and review your hosting provider's privacy and security practices. For larger traffic, move CPU-heavy jobs to a queue/worker.
+Selected files are processed in the browser by the current tool interface and are not intentionally uploaded by those tool flows. This statement does not cover hosting logs, browser extensions, or third-party infrastructure outside the frontend's control. Avoid uploading sensitive documents to any online service unless its privacy practices meet your needs.
 
-## Limitations
-PDF-to-Word, Word-to-PDF, OCR, signatures, visual PDF editing and true image recompression are not implemented. Some encrypted, malformed, or advanced PDFs may fail.
+Before public launch, review hosting settings, set appropriate file and request limits, add rate limiting and monitoring to API routes, and test malformed, encrypted and unusually large PDFs. Do not commit API keys or payment secrets. Live payments should remain disabled until accounts, database-backed entitlements, verified webhooks, refunds and server-enforced authorization are implemented.
+
+## Known limitations
+
+- PDF-to-Word, Markdown and HTML exports preserve selectable text, not the original page layout.
+- OCR exports recognized text to TXT; it does not currently create a searchable OCR PDF.
+- Image-based PDF compression rasterizes pages and may remove interactive features.
+- Encrypted, malformed or advanced PDFs may fail.
 
 ## License
-MIT. See [LICENSE](LICENSE). Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Razorpay payment demo (test mode)
-1. Deploy the Express server as a Render Web Service; GitHub Pages cannot run the billing API.
-2. In Razorpay, select **Test Mode** and create test API keys. Never commit keys to Git.
-3. Set server environment variables `RAZORPAY_KEY_ID=rzp_test_...` and `RAZORPAY_KEY_SECRET=...`. Keep live payments disabled.
-4. The Premium demo checkout creates a ₹99 INR order for 30-day demo access and verifies the signature on the server.
-5. This demo stores entitlement in browser localStorage and is not secure production authorization. Before selling access, add accounts, database-backed entitlements, idempotent webhooks, refunds/chargeback handling and server-enforced plan permissions. Never use localStorage alone as proof of payment.
+MIT. See [LICENSE](LICENSE). Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
