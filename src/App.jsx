@@ -16,7 +16,7 @@ const tools=[
 const pretty=n=>n<1048576?Math.max(1,Math.round(n/1024))+' KB':(n/1048576).toFixed(2)+' MB';
 function Brand(){return <a className="brand" href="./" aria-label="DocSwift home"><span className="brand-icon"><FileText size={23}/></span><span>doc<span>swift</span></span></a>}
 function App(){
-const [category,setCategory]=useState('All tools'),[tool,setTool]=useState(null),[files,setFiles]=useState([]),[pages,setPages]=useState(''),[order,setOrder]=useState(''),[angle,setAngle]=useState('90'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[details,setDetails]=useState(null),[mobile,setMobile]=useState(false),[faq,setFaq]=useState(-1),[drag,setDrag]=useState(false);
+const [category,setCategory]=useState('All tools'),[tool,setTool]=useState(null),[files,setFiles]=useState([]),[pages,setPages]=useState(''),[order,setOrder]=useState(''),[angle,setAngle]=useState('90'),[compression,setCompression]=useState('balanced'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[details,setDetails]=useState(null),[mobile,setMobile]=useState(false),[faq,setFaq]=useState(-1),[drag,setDrag]=useState(false);
 const picker=useRef(null);
 const shown=useMemo(()=>category==='All tools'?tools:tools.filter(t=>t.group===category),[category]);
 function open(t){setTool(t);setFiles([]);setError('');setSuccess('');setDetails(null);setPages('');setOrder('');setAngle('90');setCompression('balanced');}
