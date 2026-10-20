@@ -53,6 +53,26 @@ async function requireUser(req){
   if(error||!data?.user)throw Object.assign(new Error('Your session is invalid or expired. Sign in again and retry.'),{status:401});
   return {admin,user:data.user};
 }
+
+// NexoraPay sandbox demonstration only. This never charges a customer.
+const nexoraBase=(process.env.NEXORAPAY_BASE_URL||'https://nexorapay-sandbox.onrender.com').replace(/\/$/,'');
+function nexoraConfig(){const key=process.env.NEXORAPAY_MERCHANT_API_KEY;if(!key||!/^np_test_[a-f0-9]{64}$/.test(key))throw Object.assign(new Error('NexoraPay sandbox is not configured. Add a sandbox merchant API key to the DocSwift server environment.'),{status:503});return key}
+app.get('/api/nexorapay/sandbox/config',(_req,res)=>res.json({enabled:Boolean(process.env.NEXORAPAY_MERCHANT_API_KEY&&/^np_test_[a-f0-9]{64}$/.test(process.env.NEXORAPAY_MERCHANT_API_KEY)),mode:'SANDBOX',realPaymentsEnabled:false}));
+app.post('/api/nexorapay/sandbox/payments',wrap(async(req,res)=>{
+  const key=nexoraConfig();
+  const response=await fetch(nexoraBase+'/api/merchant/payments',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+key},body:JSON.stringify({amount:99})});
+  const body=await response.json().catch(()=>({error:'invalid_nexorapay_response'}));
+  if(!response.ok)throw Object.assign(new Error(body.error||'NexoraPay sandbox could not create a test payment.'),{status:response.status>=400&&response.status<500?502:503});
+  res.status(201).json({mode:'SANDBOX',realPaymentsEnabled:false,payment:body,message:'Test payment only. No money was collected.'});
+}));
+app.post('/api/nexorapay/sandbox/payments/:id/simulate-success',wrap(async(req,res)=>{
+  if(!/^[0-9a-f-]{36}$/i.test(req.params.id))throw Object.assign(new Error('Invalid sandbox payment ID.'),{status:400});
+  const key=nexoraConfig();
+  const response=await fetch(nexoraBase+'/api/merchant/payments/'+req.params.id+'/simulate-success',{method:'POST',headers:{authorization:'Bearer '+key}});
+  const body=await response.json().catch(()=>({error:'invalid_nexorapay_response'}));
+  if(!response.ok)throw Object.assign(new Error(body.error||'Could not simulate sandbox payment status.'),{status:response.status>=400&&response.status<500?409:503});
+  res.json({mode:'SANDBOX',realPaymentsEnabled:false,...body,message:'Simulated result only. No money was collected.'});
+}));
 app.get('/api/billing/config',(_req,res)=>res.json({enabled:Boolean(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET),mode:(process.env.RAZORPAY_KEY_ID||'').startsWith('rzp_test_')?'test':'live'}));
 app.get('/api/billing/status',wrap(async(req,res)=>{
   const {admin,user}=await requireUser(req);
