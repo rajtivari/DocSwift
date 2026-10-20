@@ -67,6 +67,10 @@ npm start
 
 The current frontend tool flows run in the browser; the Express API also includes PDF endpoints and a Razorpay test-mode billing flow. Do not treat browser-local plan flags as secure production authorization.
 
+## NexoraPay sandbox demo
+
+DocSwift includes an optional NexoraPay sandbox checkout demonstration. Configure `NEXORAPAY_BASE_URL` and a sandbox-only `NEXORAPAY_MERCHANT_API_KEY` in the **server hosting environment** (not Vite variables and never in client code). The pricing section's “Run sandbox checkout” button creates a fixed ₹99 sandbox payment and optionally simulates success. This is a developer demo only: it does not collect money, verify real UPI payments, or grant Premium access. Keep the NexoraPay merchant key private. The integration is disabled until a valid `np_test_...` key is configured on the DocSwift server.
+
 ## Privacy and security
 
 Selected files are processed in the browser by the current tool interface and are not intentionally uploaded by those tool flows. This statement does not cover hosting logs, browser extensions, or third-party infrastructure outside the frontend's control. Avoid uploading sensitive documents to any online service unless its privacy practices meet your needs.
